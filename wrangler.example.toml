@@ -1,7 +1,0 @@
-name = "control-de-gastos"
-pages_build_output_dir = "."
-compatibility_date = "2026-05-14"
-
-[[kv_namespaces]]
-binding = "KV"
-id = "REEMPLACE_CON_EL_ID_DEL_NAMESPACE"
