@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Gastos - Dashboard</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="page-background"></div>
+    
+    <!-- Main Title moved to top of page -->
+    <div class="text-center mb-4">
+        <h1 class="display-4"><i class="fas fa-wallet"></i> Control de Gastos</h1>
+        <p class="lead text-muted">Sistema de gestión de aportes y gastos</p>
+    </div>
+    
+    <!-- Centered Navigation Menu -->
+    <nav class="navbar navbar-expand-lg navbar-dark justify-content-center">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="nav-usuarios" href="#"><i class="fas fa-users"></i> Usuarios</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="nav-aporte" href="#"><i class="fas fa-coins"></i> Aporte</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="nav-gastos" href="#"><i class="fas fa-receipt"></i> Gastos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="nav-total" href="#"><i class="fas fa-chart-line"></i> Total en Caja</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Usuarios Section -->
+        <div id="usuarios-section" class="section active">
+            <div class="text-center mb-4">
+                <h2 class="d-inline-block"><i class="fas fa-users"></i> Gestión de Usuarios</h2>
+            </div>
+            <div class="section-card">
+                <div class="row align-items-center mb-4">
+                    <div class="col">
+                        <h4 class="mb-0 text-primary"><i class="fas fa-user-friends"></i> Lista de Usuarios</h4>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary me-2" id="btn-add-usuario">
+                            <i class="fas fa-plus"></i> Nuevo Usuario
+                        </button>
+                        <button class="btn btn-outline-secondary" id="btn-refresh-usuarios">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="usuarios-table">
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-hashtag me-2"></i>ID</th>
+                                <th><i class="fas fa-user me-2"></i>Nombre Completo</th>
+                                <th><i class="fas fa-cogs me-2"></i>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Usuarios will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aporte Section -->
+        <div id="aporte-section" class="section">
+            <div class="text-center mb-4">
+                <h2 class="d-inline-block"><i class="fas fa-coins"></i> Registro de Aportes</h2>
+            </div>
+            <div class="section-card">
+                <form id="aporte-form">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label for="usuario-select" class="form-label">
+                                <i class="fas fa-user-check"></i> Seleccionar Usuario(s)
+                            </label>
+                            <select class="form-select" id="usuario-select" multiple>
+                                <!-- Options will be populated from usuarios -->
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <label for="monto-aporte" class="form-label">
+                                        <i class="fas fa-coins"></i> Monto en Colones (₡)
+                                    </label>
+                                    <input type="number" class="form-control" id="monto-aporte" placeholder="Ingrese el monto" min="0" step="0.01">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="metodo-pago-aporte" class="form-label">
+                                        <i class="fas fa-credit-card"></i> Método de Pago
+                                    </label>
+                                    <select class="form-select" id="metodo-pago-aporte">
+                                        <option value="Efectivo">Efectivo</option>
+                                        <option value="Transferencia">Transferencia</option>
+                                        <option value="Sinpe Movil">Sinpe Móvil</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Registrar Aporte
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo"></i> Limpiar
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Aporte Transaction History -->
+            <div class="section-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0"><i class="fas fa-history"></i> Historial de Aportes</h4>
+                    <button class="btn btn-outline-primary btn-sm" id="clear-aporte-history">
+                        <i class="fas fa-trash"></i> Limpiar Historial
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="aporte-history-table">
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-hashtag me-2"></i>ID</th>
+                                <th><i class="fas fa-user me-2"></i>Usuario</th>
+                                <th><i class="fas fa-coins me-2"></i>Monto (₡)</th>
+                                <th><i class="fas fa-credit-card me-2"></i>Método de Pago</th>
+                                <th><i class="fas fa-calendar me-2"></i>Fecha</th>
+                                <th><i class="fas fa-cogs me-2"></i>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Aporte history will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gastos Section -->
+        <div id="gastos-section" class="section">
+            <div class="text-center mb-4">
+                <h2 class="d-inline-block"><i class="fas fa-receipt"></i> Registro de Gastos</h2>
+            </div>
+            <div class="section-card">
+                <form id="gastos-form">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="fecha-gasto" class="form-label">
+                                <i class="fas fa-calendar"></i> Fecha
+                            </label>
+                            <input type="date" class="form-control" id="fecha-gasto">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="razon-gasto" class="form-label">
+                                <i class="fas fa-tag"></i> Razón
+                            </label>
+                            <input type="text" class="form-control" id="razon-gasto" placeholder="Descripción del gasto">
+                        </div>
+                        <div class="col-md-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="monto-gasto" class="form-label">
+                                        <i class="fas fa-coins"></i> Monto en Colones (₡)
+                                    </label>
+                                    <input type="number" class="form-control" id="monto-gasto" placeholder="Ingrese el monto" min="0" step="0.01">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="metodo-pago-gasto" class="form-label">
+                                        <i class="fas fa-credit-card"></i> Método de Pago
+                                    </label>
+                                    <select class="form-select" id="metodo-pago-gasto">
+                                        <option value="Efectivo">Efectivo</option>
+                                        <option value="Transferencia">Transferencia</option>
+                                        <option value="Sinpe Movil">Sinpe Móvil</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Registrar Gasto
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo"></i> Limpiar
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Gastos Transaction History -->
+            <div class="section-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0"><i class="fas fa-history"></i> Historial de Gastos</h4>
+                    <button class="btn btn-outline-primary btn-sm" id="clear-gasto-history">
+                        <i class="fas fa-trash"></i> Limpiar Historial
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="gasto-history-table">
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-hashtag me-2"></i>ID</th>
+                                <th><i class="fas fa-calendar me-2"></i>Fecha</th>
+                                <th><i class="fas fa-tag me-2"></i>Razón</th>
+                                <th><i class="fas fa-coins me-2"></i>Monto (₡)</th>
+                                <th><i class="fas fa-credit-card me-2"></i>Método de Pago</th>
+                                <th><i class="fas fa-cogs me-2"></i>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Gasto history will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="section-card">
+                <h4 class="text-primary mb-3"><i class="fas fa-file-excel"></i> Reportes de Gastos</h4>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-info" id="btn-reporte-mes">
+                        <i class="fas fa-calendar-alt"></i> Reporte por Mes
+                    </button>
+                    <button class="btn btn-warning" id="btn-reporte-rango">
+                        <i class="fas fa-calendar-week"></i> Reporte por Rango
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total en Caja Section -->
+        <div id="total-section" class="section">
+            <div class="text-center mb-4">
+                <h2 class="d-inline-block"><i class="fas fa-chart-line"></i> Total en Caja y Reportes</h2>
+            </div>
+            
+            <div class="filter-section">
+                <h4 class="filter-title"><i class="fas fa-filter"></i> Filtros de Búsqueda</h4>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="usuario-total" class="form-label">
+                            <i class="fas fa-user"></i> Usuario
+                        </label>
+                        <select class="form-select" id="usuario-total">
+                            <option value="">Todos los Usuarios</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mes-total" class="form-label">
+                            <i class="fas fa-calendar"></i> Mes
+                        </label>
+                        <input type="month" class="form-control" id="mes-total">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="fecha-desde" class="form-label">
+                            <i class="fas fa-calendar-day"></i> Fecha Desde
+                        </label>
+                        <input type="date" class="form-control" id="fecha-desde">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="fecha-hasta" class="form-label">
+                            <i class="fas fa-calendar-day"></i> Fecha Hasta
+                        </label>
+                        <input type="date" class="form-control" id="fecha-hasta">
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mb-4">
+                <button class="btn btn-success" id="btn-reporte-contribuciones">
+                    <i class="fas fa-file-excel"></i> Reporte de Aportes
+                </button>
+                <button class="btn btn-danger" id="btn-reporte-gastos">
+                    <i class="fas fa-file-excel"></i> Reporte de Gastos
+                </button>
+            </div>
+            
+            <!-- Export Format Modal -->
+            <div class="modal fade" id="exportFormatModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="fas fa-download"></i> Seleccionar Formato</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <p class="mb-4">¿En qué formato desea exportar el reporte?</p>
+                            <div class="d-flex gap-2 justify-content-center">
+                                <button class="btn btn-success btn-lg" id="btn-export-excel">
+                                    <i class="fas fa-file-excel fa-2x mb-2"></i><br>Excel (.xlsx)
+                                </button>
+                                <button class="btn btn-danger btn-lg" id="btn-export-pdf">
+                                    <i class="fas fa-file-pdf fa-2x mb-2"></i><br>PDF (.pdf)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section-card">
+                <h4 class="text-primary mb-4"><i class="fas fa-chart-pie"></i> Resumen Financiero</h4>
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <div class="stats-value text-success" id="total-aportes-valor">₡ 0.00</div>
+                            <div class="stats-label"><i class="fas fa-arrow-up"></i> Total Aportes</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <div class="stats-value text-danger" id="total-gastos-valor">₡ 0.00</div>
+                            <div class="stats-label"><i class="fas fa-arrow-down"></i> Total Gastos</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <div class="stats-value text-primary" id="sobrante-valor">₡ 0.00</div>
+                            <div class="stats-label"><i class="fas fa-wallet"></i> Sobrante</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container for notifications -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+        <div id="toast-container"></div>
+    </div>
+
+    <!-- Modal for adding/editing usuario -->
+    <div class="modal fade" id="usuarioModal" tabindex="-1" aria-labelledby="usuarioModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="usuarioModalLabel"><i class="fas fa-user"></i> Usuario</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="usuario-form">
+                        <input type="hidden" id="usuario-id">
+                        <div class="mb-3">
+                            <label for="nombre" class="form-label">
+                                <i class="fas fa-user"></i> Nombre
+                            </label>
+                            <input type="text" class="form-control" id="nombre" placeholder="Ingrese el nombre" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="primerApellido" class="form-label">
+                                <i class="fas fa-user-tag"></i> Primer Apellido
+                            </label>
+                            <input type="text" class="form-control" id="primerApellido" placeholder="Ingrese el primer apellido" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="segundoApellido" class="form-label">
+                                <i class="fas fa-user-tag"></i> Segundo Apellido
+                            </label>
+                            <input type="text" class="form-control" id="segundoApellido" placeholder="Ingrese el segundo apellido">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btn-save-usuario">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for adding/editing aporte -->
+    <div class="modal fade" id="aporteModal" tabindex="-1" aria-labelledby="aporteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="aporteModalLabel"><i class="fas fa-coins"></i> Aporte</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="aporte-edit-form">
+                        <input type="hidden" id="aporte-edit-id">
+                        <div class="mb-3">
+                            <label for="aporte-edit-usuario" class="form-label">
+                                <i class="fas fa-user-check"></i> Seleccionar Usuario(s)
+                            </label>
+                            <select class="form-select" id="aporte-edit-usuario" multiple>
+                                <!-- Options will be populated from usuarios -->
+                            </select>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="aporte-edit-monto" class="form-label">
+                                    <i class="fas fa-coins"></i> Monto en Colones (₡)
+                                </label>
+                                <input type="number" class="form-control" id="aporte-edit-monto" placeholder="Ingrese el monto" min="0" step="0.01">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="aporte-edit-metodo-pago" class="form-label">
+                                    <i class="fas fa-credit-card"></i> Método de Pago
+                                </label>
+                                <select class="form-select" id="aporte-edit-metodo-pago">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Sinpe Movil">Sinpe Móvil</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="button" class="btn btn-success" id="btn-save-aporte-edit">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+            </div>
+        </div>
+
+        <!-- Modal: Reporte Gastos por Mes -->
+        <div class="modal fade" id="gastosMesModal" tabindex="-1" aria-labelledby="gastosMesModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gastosMesModalLabel"><i class="fas fa-calendar-alt"></i> Reporte de Gastos por Mes</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="mes-gastos" class="form-label"><i class="fas fa-calendar"></i> Seleccione el Mes</label>
+                            <input type="month" class="form-control" id="mes-gastos">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><i class="fas fa-times"></i> Cancelar</button>
+                        <button type="button" class="btn btn-success" id="btn-export-gastos-mes"><i class="fas fa-file-excel"></i> Exportar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Reporte Gastos por Rango -->
+        <div class="modal fade" id="gastosRangoModal" tabindex="-1" aria-labelledby="gastosRangoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gastosRangoModalLabel"><i class="fas fa-calendar-week"></i> Reporte de Gastos por Rango</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label for="fecha-desde-gastos" class="form-label"><i class="fas fa-calendar-day"></i> Desde</label>
+                                <input type="date" class="form-control" id="fecha-desde-gastos">
+                            </div>
+                            <div class="col-6">
+                                <label for="fecha-hasta-gastos" class="form-label"><i class="fas fa-calendar-day"></i> Hasta</label>
+                                <input type="date" class="form-control" id="fecha-hasta-gastos">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><i class="fas fa-times"></i> Cancelar</button>
+                        <button type="button" class="btn btn-success" id="btn-export-gastos-rango"><i class="fas fa-file-excel"></i> Exportar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for adding/editing gasto -->
+
+    <div class="modal fade" id="gastoModal" tabindex="-1" aria-labelledby="gastoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="gastoModalLabel"><i class="fas fa-receipt"></i> Gasto</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="gasto-edit-form">
+                        <input type="hidden" id="gasto-edit-id">
+                        <div class="mb-3">
+                            <label for="gasto-edit-fecha" class="form-label">
+                                <i class="fas fa-calendar"></i> Fecha
+                            </label>
+                            <input type="date" class="form-control" id="gasto-edit-fecha">
+                        </div>
+                        <div class="mb-3">
+                            <label for="gasto-edit-razon" class="form-label">
+                                <i class="fas fa-tag"></i> Razón
+                            </label>
+                            <input type="text" class="form-control" id="gasto-edit-razon" placeholder="Descripción del gasto">
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="gasto-edit-monto" class="form-label">
+                                    <i class="fas fa-coins"></i> Monto en Colones (₡)
+                                </label>
+                                <input type="number" class="form-control" id="gasto-edit-monto" placeholder="Ingrese el monto" min="0" step="0.01">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="gasto-edit-metodo-pago" class="form-label">
+                                    <i class="fas fa-credit-card"></i> Método de Pago
+                                </label>
+                                <select class="form-select" id="gasto-edit-metodo-pago">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Sinpe Movil">Sinpe Móvil</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="button" class="btn btn-success" id="btn-save-gasto-edit">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS and dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <!-- html2canvas for PDF export -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+
+    <footer class="text-center py-3 mt-4">
+        <p class="mb-0">Diseñado y programado por: ©Tec.Alberto Hidalgo</p>
+    </footer>
+</body>
+</html>
