@@ -14,16 +14,27 @@
     <link href="style.css" rel="stylesheet">
 </head>
 <body>
-    <div class="page-background"></div>
+    <div class="app-shell">
+    <header class="app-header">
+        <div class="brand-block">
+            <div class="brand-icon">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <div>
+                <p class="eyebrow mb-1">Control financiero compartido</p>
+                <h1 class="mb-1">Control de Gastos</h1>
+                <p class="header-copy mb-0">Gestión centralizada de usuarios, aportes, gastos y reportes.</p>
+            </div>
+        </div>
+        <div class="header-tools">
+            <div class="sync-pill" id="sync-status">
+                <span class="sync-dot" id="sync-dot"></span>
+                <span id="sync-status-label">Conectando</span>
+            </div>
+        </div>
+    </header>
     
-    <!-- Main Title moved to top of page -->
-    <div class="text-center mb-4">
-        <h1 class="display-4"><i class="fas fa-wallet"></i> Control de Gastos</h1>
-        <p class="lead text-muted">Sistema de gestión de aportes y gastos</p>
-    </div>
-    
-    <!-- Centered Navigation Menu -->
-    <nav class="navbar navbar-expand-lg navbar-dark justify-content-center">
+    <nav class="navbar navbar-expand-lg navbar-light app-nav">
         <div class="container-fluid">
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
@@ -47,11 +58,48 @@
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <main class="container-fluid app-main">
+        <section class="summary-grid" aria-label="Resumen general">
+            <article class="summary-card summary-card-users">
+                <div class="summary-icon"><i class="fas fa-users"></i></div>
+                <div>
+                    <span class="summary-label">Usuarios</span>
+                    <strong class="summary-value" id="summary-users">0</strong>
+                </div>
+            </article>
+            <article class="summary-card summary-card-income">
+                <div class="summary-icon"><i class="fas fa-arrow-trend-up"></i></div>
+                <div>
+                    <span class="summary-label">Aportes</span>
+                    <strong class="summary-value" id="summary-aportes">₡ 0.00</strong>
+                </div>
+            </article>
+            <article class="summary-card summary-card-expense">
+                <div class="summary-icon"><i class="fas fa-receipt"></i></div>
+                <div>
+                    <span class="summary-label">Gastos</span>
+                    <strong class="summary-value" id="summary-gastos">₡ 0.00</strong>
+                </div>
+            </article>
+            <article class="summary-card summary-card-balance">
+                <div class="summary-icon"><i class="fas fa-scale-balanced"></i></div>
+                <div>
+                    <span class="summary-label">En caja</span>
+                    <strong class="summary-value" id="summary-caja">₡ 0.00</strong>
+                </div>
+            </article>
+        </section>
+
         <!-- Usuarios Section -->
         <div id="usuarios-section" class="section active">
-            <div class="text-center mb-4">
-                <h2 class="d-inline-block"><i class="fas fa-users"></i> Gestión de Usuarios</h2>
+            <div class="section-header">
+                <div>
+                    <p class="eyebrow mb-1">Administración</p>
+                    <h2><i class="fas fa-users"></i> Usuarios</h2>
+                </div>
+                <button class="btn btn-primary" id="btn-add-usuario">
+                    <i class="fas fa-plus"></i> Nuevo Usuario
+                </button>
             </div>
             <div class="section-card">
                 <div class="row align-items-center mb-4">
@@ -59,9 +107,6 @@
                         <h4 class="mb-0 text-primary"><i class="fas fa-user-friends"></i> Lista de Usuarios</h4>
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-primary me-2" id="btn-add-usuario">
-                            <i class="fas fa-plus"></i> Nuevo Usuario
-                        </button>
                         <button class="btn btn-outline-secondary" id="btn-refresh-usuarios">
                             <i class="fas fa-sync-alt"></i>
                         </button>
@@ -86,8 +131,11 @@
 
         <!-- Aporte Section -->
         <div id="aporte-section" class="section">
-            <div class="text-center mb-4">
-                <h2 class="d-inline-block"><i class="fas fa-coins"></i> Registro de Aportes</h2>
+            <div class="section-header">
+                <div>
+                    <p class="eyebrow mb-1">Entradas</p>
+                    <h2><i class="fas fa-coins"></i> Registro de Aportes</h2>
+                </div>
             </div>
             <div class="section-card">
                 <form id="aporte-form">
@@ -162,8 +210,11 @@
 
         <!-- Gastos Section -->
         <div id="gastos-section" class="section">
-            <div class="text-center mb-4">
-                <h2 class="d-inline-block"><i class="fas fa-receipt"></i> Registro de Gastos</h2>
+            <div class="section-header">
+                <div>
+                    <p class="eyebrow mb-1">Salidas</p>
+                    <h2><i class="fas fa-receipt"></i> Registro de Gastos</h2>
+                </div>
             </div>
             <div class="section-card">
                 <form id="gastos-form">
@@ -254,8 +305,11 @@
 
         <!-- Total en Caja Section -->
         <div id="total-section" class="section">
-            <div class="text-center mb-4">
-                <h2 class="d-inline-block"><i class="fas fa-chart-line"></i> Total en Caja y Reportes</h2>
+            <div class="section-header">
+                <div>
+                    <p class="eyebrow mb-1">Análisis</p>
+                    <h2><i class="fas fa-chart-line"></i> Total en Caja y Reportes</h2>
+                </div>
             </div>
             
             <div class="filter-section">
@@ -346,7 +400,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <!-- Toast Container for notifications -->
     <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
@@ -567,5 +621,6 @@
     <footer class="text-center py-3 mt-4">
         <p class="mb-0">Diseñado y programado por: ©Tec.Alberto Hidalgo</p>
     </footer>
+    </div>
 </body>
 </html>

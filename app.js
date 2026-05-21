@@ -99,6 +99,7 @@ const DB = (() => {
         if (typeof renderAporteHistory === 'function') renderAporteHistory();
         if (typeof renderGastoHistory === 'function') renderGastoHistory();
         if (typeof updateTotalEnCaja === 'function') updateTotalEnCaja();
+        if (typeof updateDashboardSummary === 'function') updateDashboardSummary();
     }
 
     function buildPatch(collection, previous, next, options = {}) {
@@ -126,7 +127,7 @@ const DB = (() => {
         warnedLocalMode = true;
 
         if (typeof showToast === 'function') {
-            showToast('Modo local: configure GASTOS_DB en Cloudflare para compartir datos', 'warning');
+            showToast('Modo local: configure un binding KV en Cloudflare para compartir datos', 'warning');
         }
     }
 
@@ -157,6 +158,7 @@ const DB = (() => {
                 remoteEnabled = false;
                 console.error('No se pudo sincronizar con Cloudflare:', error);
                 warnLocalMode();
+                if (typeof updateDashboardSummary === 'function') updateDashboardSummary();
             })
             .finally(() => {
                 pendingWrites -= 1;
@@ -219,6 +221,7 @@ const DB = (() => {
         } catch (error) {
             remoteEnabled = false;
             if (!options.silent) warnLocalMode();
+            if (typeof updateDashboardSummary === 'function') updateDashboardSummary();
             return false;
         }
     }
@@ -251,6 +254,40 @@ function initializeSampleData() {
 // Generate unique ID
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+function formatCurrency(amount) {
+    return `₡ ${Number(amount || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function setElementText(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.textContent = value;
+    }
+}
+
+function updateDashboardSummary() {
+    const usuarios = DB.getUsuarios();
+    const aportes = DB.getAportes();
+    const gastos = DB.getGastos();
+    const totalAportes = aportes.reduce((sum, aporte) => sum + aporte.monto, 0);
+    const totalGastos = gastos.reduce((sum, gasto) => sum + gasto.monto, 0);
+
+    setElementText('summary-users', usuarios.length.toLocaleString('es-CR'));
+    setElementText('summary-aportes', formatCurrency(totalAportes));
+    setElementText('summary-gastos', formatCurrency(totalGastos));
+    setElementText('summary-caja', formatCurrency(totalAportes - totalGastos));
+
+    const syncLabel = document.getElementById('sync-status-label');
+    const syncDot = document.getElementById('sync-dot');
+    const syncStatus = document.getElementById('sync-status');
+    if (!syncLabel || !syncDot || !syncStatus) return;
+
+    const isRemote = DB.isRemoteEnabled();
+    syncLabel.textContent = isRemote ? 'Datos compartidos' : 'Modo local';
+    syncStatus.classList.toggle('is-online', isRemote);
+    syncStatus.classList.toggle('is-offline', !isRemote);
 }
 
 // Toast notification system with animation
@@ -336,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     updateTotalEnCaja();
 
     if (!DB.isRemoteEnabled() && window.location.protocol !== 'file:') {
-        showToast('Modo local: configure GASTOS_DB en Cloudflare para compartir datos', 'warning');
+        showToast('Modo local: configure un binding KV en Cloudflare para compartir datos', 'warning');
     }
 
     setInterval(() => {
@@ -349,6 +386,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // ============= USUARIOS SECTION =============
 
 function renderUsuarios() {
+    updateDashboardSummary();
     const usuarios = DB.getUsuarios();
     const tbody = document.querySelector('#usuarios-table tbody');
     
@@ -564,8 +602,6 @@ function updateTotalEnCaja() {
     const totalGastos = gastos.reduce((sum, g) => sum + g.monto, 0);
     const sobrante = totalAportes - totalGastos;
     
-    const formatCurrency = (amount) => `₡ ${amount.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    
     const aportesEl = document.getElementById('total-aportes-valor');
     const gastosEl = document.getElementById('total-gastos-valor');
     const sobranteEl = document.getElementById('sobrante-valor');
@@ -583,7 +619,7 @@ function animateValue(element, start, end, duration) {
         if (!startTimestamp) startTimestamp = timestamp;
         const progress = Math.min((timestamp - startTimestamp) / duration, 1);
         const value = progress * (end - start) + start;
-        element.textContent = `₡ ${value.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        element.textContent = formatCurrency(value);
         if (progress < 1) {
             window.requestAnimationFrame(step);
         }
@@ -1006,6 +1042,7 @@ function exportReporteCompletoPDF(filters) {
 
 // ============= APORTE HISTORY =============
 function renderAporteHistory() {
+    updateDashboardSummary();
     const aportes = DB.getAportes();
     const tbody = document.querySelector('#aporte-history-table tbody');
     
@@ -1039,6 +1076,7 @@ function renderAporteHistory() {
 
 // ============= GASTO HISTORY =============
 function renderGastoHistory() {
+    updateDashboardSummary();
     const gastos = DB.getGastos();
     const tbody = document.querySelector('#gasto-history-table tbody');
     
@@ -1075,7 +1113,9 @@ function getMetodoPagoBadgeClass(metodo) {
     switch (metodo) {
         case 'Efectivo': return 'bg-success';
         case 'Transferencia': return 'bg-info';
-        case 'Sinpe Movil': return 'bg-warning';
+        case 'Sinpe Movil':
+        case 'Sinpe Móvil':
+            return 'bg-warning';
         default: return 'bg-secondary';
     }
 }
