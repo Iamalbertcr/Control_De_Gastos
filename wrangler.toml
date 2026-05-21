@@ -1,0 +1,7 @@
+name = "control-de-gastos"
+pages_build_output_dir = "."
+compatibility_date = "2026-05-14"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "e794211542fa4f8284dcf7063cae51de"

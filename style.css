@@ -975,6 +975,8 @@ body::before,
 .header-tools {
     display: flex;
     align-items: center;
+    flex-direction: column;
+    align-items: flex-end;
     gap: 0.75rem;
 }
 
@@ -1007,6 +1009,15 @@ body::before,
 
 .sync-pill.is-offline .sync-dot {
     background: var(--danger);
+}
+
+.sync-detail {
+    max-width: min(460px, 44vw);
+    color: var(--danger);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: right;
 }
 
 .navbar.app-nav {
@@ -1317,6 +1328,15 @@ footer {
     .app-header {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .header-tools {
+        align-items: flex-start;
+    }
+
+    .sync-detail {
+        max-width: 100%;
+        text-align: left;
     }
 
     .summary-grid {

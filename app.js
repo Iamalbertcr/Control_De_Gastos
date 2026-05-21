@@ -13,6 +13,7 @@ const DB = (() => {
     let pendingWrites = 0;
     let saveQueue = Promise.resolve();
     let warnedLocalMode = false;
+    let lastError = '';
 
     function safeParse(value, fallback) {
         try {
@@ -79,12 +80,23 @@ const DB = (() => {
         }
 
         const response = await fetch(API_URL, options);
-        const payload = await response.json().catch(() => ({}));
+        const responseText = await response.text();
+        const contentType = response.headers.get('content-type') || '';
+        const payload = safeParse(responseText, null);
 
         if (!response.ok) {
-            throw new Error(payload.error || `API error ${response.status}`);
+            if (response.status === 404) {
+                throw new Error('No existe /api/data. El despliegue no incluyo la carpeta functions o Pages Functions no esta activo.');
+            }
+
+            throw new Error((payload && payload.error) || `API error ${response.status}`);
         }
 
+        if (!payload || !contentType.includes('application/json')) {
+            throw new Error('/api/data no devolvio JSON. Cloudflare esta sirviendo HTML en vez de la Function.');
+        }
+
+        lastError = '';
         return normalizeData(payload);
     }
 
@@ -127,7 +139,7 @@ const DB = (() => {
         warnedLocalMode = true;
 
         if (typeof showToast === 'function') {
-            showToast('Modo local: configure un binding KV en Cloudflare para compartir datos', 'warning');
+            showToast(lastError || 'Modo local: configure un binding KV en Cloudflare para compartir datos', 'warning');
         }
     }
 
@@ -156,6 +168,7 @@ const DB = (() => {
             })
             .catch(error => {
                 remoteEnabled = false;
+                lastError = error.message;
                 console.error('No se pudo sincronizar con Cloudflare:', error);
                 warnLocalMode();
                 if (typeof updateDashboardSummary === 'function') updateDashboardSummary();
@@ -201,6 +214,7 @@ const DB = (() => {
             return true;
         } catch (error) {
             remoteEnabled = false;
+            lastError = error.message;
             initialized = true;
             console.warn('Usando datos locales porque la API compartida no esta disponible:', error);
             return false;
@@ -220,6 +234,7 @@ const DB = (() => {
             return true;
         } catch (error) {
             remoteEnabled = false;
+            lastError = error.message;
             if (!options.silent) warnLocalMode();
             if (typeof updateDashboardSummary === 'function') updateDashboardSummary();
             return false;
@@ -230,6 +245,7 @@ const DB = (() => {
         init,
         refresh,
         isRemoteEnabled: () => remoteEnabled,
+        getLastError: () => lastError,
         getUsuarios: () => cloneItems(state.usuarios),
         setUsuarios: data => setCollection('usuarios', data),
         getAportes: () => cloneItems(state.aportes),
@@ -282,12 +298,19 @@ function updateDashboardSummary() {
     const syncLabel = document.getElementById('sync-status-label');
     const syncDot = document.getElementById('sync-dot');
     const syncStatus = document.getElementById('sync-status');
+    const syncDetail = document.getElementById('sync-detail');
     if (!syncLabel || !syncDot || !syncStatus) return;
 
     const isRemote = DB.isRemoteEnabled();
+    const lastError = DB.getLastError();
     syncLabel.textContent = isRemote ? 'Datos compartidos' : 'Modo local';
+    syncStatus.title = isRemote ? 'La app esta sincronizando con Cloudflare KV.' : lastError;
     syncStatus.classList.toggle('is-online', isRemote);
     syncStatus.classList.toggle('is-offline', !isRemote);
+
+    if (syncDetail) {
+        syncDetail.textContent = isRemote ? '' : lastError;
+    }
 }
 
 // Toast notification system with animation

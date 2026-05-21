@@ -31,11 +31,23 @@ GASTOS
 Despues del redeploy, abra:
 
 ```text
+https://TU-DOMINIO/api/health
+```
+
+Debe devolver `ok: true` y el nombre del binding detectado, por ejemplo `KV`.
+
+Luego abra:
+
+```text
 https://TU-DOMINIO/api/data
 ```
 
 Debe devolver un JSON con `usuarios`, `aportes` y `gastos`. Si devuelve un error
 de binding KV, falta configurar el binding o falta redeploy.
+
+Si `/api/health` devuelve una pagina HTML o 404, Cloudflare no esta ejecutando
+Pages Functions para este deploy. Verifique que la carpeta `functions/` este en
+el repositorio/despliegue y haga un redeploy.
 
 ## Desarrollo local
 
@@ -47,6 +59,18 @@ npx wrangler pages dev . --kv=KV --compatibility-date=2026-05-14
 
 Puede actualizar la fecha de compatibilidad cuando su version local de Wrangler
 soporte una fecha mas nueva.
+
+## Binding ya configurado por archivo
+
+Este proyecto ya incluye `wrangler.toml` con el KV namespace:
+
+```text
+binding = "KV"
+id = "e794211542fa4f8284dcf7063cae51de"
+```
+
+Cuando Cloudflare haga el siguiente deploy, debe tomar este archivo como la
+configuracion del proyecto.
 
 ## Si el dashboard no deja agregar bindings
 
