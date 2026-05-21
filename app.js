@@ -1,14 +1,242 @@
 // Control de Gastos - Main Application
 
-// Database structure using localStorage
-const DB = {
-    getUsuarios: () => JSON.parse(localStorage.getItem('usuarios') || '[]'),
-    setUsuarios: (data) => localStorage.setItem('usuarios', JSON.stringify(data)),
-    getAportes: () => JSON.parse(localStorage.getItem('aportes') || '[]'),
-    setAportes: (data) => localStorage.setItem('aportes', JSON.stringify(data)),
-    getGastos: () => JSON.parse(localStorage.getItem('gastos') || '[]'),
-    setGastos: (data) => localStorage.setItem('gastos', JSON.stringify(data))
-};
+// Shared JSON-backed database. Cloudflare Pages serves /api/data from functions/api/data.js.
+// localStorage is kept only as an offline/local fallback.
+const DB = (() => {
+    const API_URL = '/api/data';
+    const LOCAL_STATE_KEY = 'controlGastosData';
+    const COLLECTIONS = ['usuarios', 'aportes', 'gastos'];
+
+    let state = loadLocalData();
+    let remoteEnabled = false;
+    let initialized = false;
+    let pendingWrites = 0;
+    let saveQueue = Promise.resolve();
+    let warnedLocalMode = false;
+
+    function safeParse(value, fallback) {
+        try {
+            return value ? JSON.parse(value) : fallback;
+        } catch (error) {
+            return fallback;
+        }
+    }
+
+    function normalizeData(data = {}) {
+        return {
+            usuarios: Array.isArray(data.usuarios) ? data.usuarios : [],
+            aportes: Array.isArray(data.aportes) ? data.aportes : [],
+            gastos: Array.isArray(data.gastos) ? data.gastos : [],
+            updatedAt: data.updatedAt || null
+        };
+    }
+
+    function cloneItems(items) {
+        return Array.isArray(items)
+            ? items.map(item => item && typeof item === 'object' ? { ...item } : item)
+            : [];
+    }
+
+    function loadLocalData() {
+        const savedState = safeParse(localStorage.getItem(LOCAL_STATE_KEY), null);
+        if (savedState) {
+            return normalizeData(savedState);
+        }
+
+        return normalizeData({
+            usuarios: safeParse(localStorage.getItem('usuarios'), []),
+            aportes: safeParse(localStorage.getItem('aportes'), []),
+            gastos: safeParse(localStorage.getItem('gastos'), [])
+        });
+    }
+
+    function saveLocalData() {
+        localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(state));
+        COLLECTIONS.forEach(collection => {
+            localStorage.setItem(collection, JSON.stringify(state[collection]));
+        });
+        localStorage.setItem('dataInitialized', 'true');
+    }
+
+    function hasRecords(data) {
+        return COLLECTIONS.some(collection => data[collection].length > 0);
+    }
+
+    function canUseRemote() {
+        return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+    }
+
+    async function requestRemote(method = 'GET', body = null) {
+        const options = {
+            method,
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        };
+
+        if (body) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body);
+        }
+
+        const response = await fetch(API_URL, options);
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(payload.error || `API error ${response.status}`);
+        }
+
+        return normalizeData(payload);
+    }
+
+    function replaceState(nextState) {
+        state = normalizeData(nextState);
+        saveLocalData();
+    }
+
+    function renderAll() {
+        if (typeof renderUsuarios === 'function') renderUsuarios();
+        if (typeof populateUsuarioSelects === 'function') populateUsuarioSelects();
+        if (typeof renderAporteHistory === 'function') renderAporteHistory();
+        if (typeof renderGastoHistory === 'function') renderGastoHistory();
+        if (typeof updateTotalEnCaja === 'function') updateTotalEnCaja();
+    }
+
+    function buildPatch(collection, previous, next, options = {}) {
+        const previousList = Array.isArray(previous) ? previous : [];
+        const nextList = Array.isArray(next) ? next : [];
+        const previousById = new Map(previousList.filter(item => item && item.id).map(item => [item.id, item]));
+        const nextById = new Map(nextList.filter(item => item && item.id).map(item => [item.id, item]));
+
+        return {
+            collection,
+            clear: Boolean(options.clear),
+            deletedIds: previousList
+                .filter(item => item && item.id && !nextById.has(item.id))
+                .map(item => item.id),
+            upserted: nextList.filter(item => {
+                if (!item || !item.id) return false;
+                const previousItem = previousById.get(item.id);
+                return !previousItem || JSON.stringify(previousItem) !== JSON.stringify(item);
+            })
+        };
+    }
+
+    function warnLocalMode() {
+        if (warnedLocalMode) return;
+        warnedLocalMode = true;
+
+        if (typeof showToast === 'function') {
+            showToast('Modo local: configure GASTOS_DB en Cloudflare para compartir datos', 'warning');
+        }
+    }
+
+    function schedulePatch(collection, previous, next, options = {}) {
+        if (!canUseRemote()) return;
+
+        if (!remoteEnabled && initialized) {
+            warnLocalMode();
+            return;
+        }
+
+        if (!remoteEnabled) return;
+
+        const patch = buildPatch(collection, previous, next, options);
+        if (!patch.clear && patch.deletedIds.length === 0 && patch.upserted.length === 0) {
+            return;
+        }
+
+        pendingWrites += 1;
+        saveQueue = saveQueue
+            .then(async () => {
+                const remoteData = await requestRemote('PATCH', patch);
+                remoteEnabled = true;
+                replaceState(remoteData);
+                renderAll();
+            })
+            .catch(error => {
+                remoteEnabled = false;
+                console.error('No se pudo sincronizar con Cloudflare:', error);
+                warnLocalMode();
+            })
+            .finally(() => {
+                pendingWrites -= 1;
+            });
+    }
+
+    function setCollection(collection, next, options = {}) {
+        const previous = cloneItems(state[collection]);
+        const nextItems = cloneItems(next);
+        state = {
+            ...state,
+            [collection]: nextItems,
+            updatedAt: new Date().toISOString()
+        };
+        saveLocalData();
+        schedulePatch(collection, previous, state[collection], options);
+    }
+
+    async function init() {
+        state = loadLocalData();
+        saveLocalData();
+
+        if (!canUseRemote()) {
+            initialized = true;
+            return false;
+        }
+
+        try {
+            const remoteData = await requestRemote('GET');
+            remoteEnabled = true;
+
+            if (hasRecords(remoteData) || !hasRecords(state)) {
+                replaceState(remoteData);
+            } else {
+                const seededData = await requestRemote('PUT', state);
+                replaceState(seededData);
+            }
+
+            initialized = true;
+            return true;
+        } catch (error) {
+            remoteEnabled = false;
+            initialized = true;
+            console.warn('Usando datos locales porque la API compartida no esta disponible:', error);
+            return false;
+        }
+    }
+
+    async function refresh(options = {}) {
+        if (!canUseRemote() || pendingWrites > 0) {
+            return false;
+        }
+
+        try {
+            const remoteData = await requestRemote('GET');
+            remoteEnabled = true;
+            replaceState(remoteData);
+            if (options.render) renderAll();
+            return true;
+        } catch (error) {
+            remoteEnabled = false;
+            if (!options.silent) warnLocalMode();
+            return false;
+        }
+    }
+
+    return {
+        init,
+        refresh,
+        isRemoteEnabled: () => remoteEnabled,
+        getUsuarios: () => cloneItems(state.usuarios),
+        setUsuarios: data => setCollection('usuarios', data),
+        getAportes: () => cloneItems(state.aportes),
+        setAportes: data => setCollection('aportes', data),
+        clearAportes: () => setCollection('aportes', [], { clear: true }),
+        getGastos: () => cloneItems(state.gastos),
+        setGastos: data => setCollection('gastos', data),
+        clearGastos: () => setCollection('gastos', [], { clear: true })
+    };
+})();
 
 // Initialize sample data if empty
 function initializeSampleData() {
@@ -91,7 +319,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 });
 
 // Initialize default dates
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const today = new Date();
     const formattedDate = today.toISOString().split('T')[0];
     const formattedMonth = today.toISOString().substring(0, 7);
@@ -99,12 +327,23 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('fecha-gasto').value = formattedDate;
     document.getElementById('mes-total').value = formattedMonth;
     
+    await DB.init();
     initializeSampleData();
     renderUsuarios();
     populateUsuarioSelects();
     renderAporteHistory();
     renderGastoHistory();
     updateTotalEnCaja();
+
+    if (!DB.isRemoteEnabled() && window.location.protocol !== 'file:') {
+        showToast('Modo local: configure GASTOS_DB en Cloudflare para compartir datos', 'warning');
+    }
+
+    setInterval(() => {
+        if (DB.isRemoteEnabled()) {
+            DB.refresh({ render: true, silent: true });
+        }
+    }, 30000);
 });
 
 // ============= USUARIOS SECTION =============
@@ -157,9 +396,10 @@ function openUsuarioModal(usuario = null) {
 }
 
 document.getElementById('btn-add-usuario').addEventListener('click', () => openUsuarioModal());
-document.getElementById('btn-refresh-usuarios').addEventListener('click', function() {
+document.getElementById('btn-refresh-usuarios').addEventListener('click', async function() {
+    const refreshed = await DB.refresh({ render: true });
     renderUsuarios();
-    showToast('Lista actualizada', 'info');
+    showToast(refreshed ? 'Lista actualizada' : 'Mostrando datos locales', refreshed ? 'info' : 'warning');
 });
 document.getElementById('btn-save-usuario').addEventListener('click', saveUsuario);
 
@@ -286,9 +526,11 @@ document.getElementById('gastos-form').addEventListener('submit', function(e) {
     });
     
     DB.setGastos(gastos);
-    bootstrap.Modal.getInstance(document.getElementById('gastoModal')).hide();
+    this.reset();
+    document.getElementById('fecha-gasto').value = new Date().toISOString().split('T')[0];
     renderGastoHistory();
     updateTotalEnCaja();
+    showToast('Gasto registrado correctamente', 'success');
 });
 
 // ============= GASTOS HISTORY LIMPIEZA =============
@@ -995,7 +1237,7 @@ document.getElementById('btn-save-gasto-edit').addEventListener('click', functio
 // ============= LIMPIEZA DE HISTORIALES =============
 document.getElementById('clear-aporte-history').addEventListener('click', function() {
     if (confirm('¿Está seguro de limpiar todo el historial de aportes?')) {
-        DB.setAportes([]);
+        DB.clearAportes();
         renderAporteHistory();
         updateTotalEnCaja();
         showToast('Historial de aportes limpiado correctamente', 'success');
@@ -1004,7 +1246,7 @@ document.getElementById('clear-aporte-history').addEventListener('click', functi
 
 document.getElementById('clear-gasto-history').addEventListener('click', function() {
     if (confirm('¿Está seguro de limpiar todo el historial de gastos?')) {
-        DB.setGastos([]);
+        DB.clearGastos();
         renderGastoHistory();
         updateTotalEnCaja();
         showToast('Historial de gastos limpiado correctamente', 'success');
