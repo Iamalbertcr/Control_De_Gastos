@@ -159,6 +159,8 @@ const DB = (() => {
         }
 
         pendingWrites += 1;
+        LoadingState.show('Guardando cambios...');
+        
         saveQueue = saveQueue
             .then(async () => {
                 const remoteData = await requestRemote('PATCH', patch);
@@ -175,6 +177,9 @@ const DB = (() => {
             })
             .finally(() => {
                 pendingWrites -= 1;
+                if (pendingWrites <= 0) {
+                    LoadingState.hide();
+                }
             });
     }
 
@@ -200,6 +205,7 @@ const DB = (() => {
         }
 
         try {
+            LoadingState.show('Cargando datos...');
             const remoteData = await requestRemote('GET');
             remoteEnabled = true;
 
@@ -218,6 +224,8 @@ const DB = (() => {
             initialized = true;
             console.warn('Usando datos locales porque la API compartida no esta disponible:', error);
             return false;
+        } finally {
+            LoadingState.hide();
         }
     }
 
@@ -280,6 +288,43 @@ function setElementText(id, value) {
     const element = document.getElementById(id);
     if (element) {
         element.textContent = value;
+    }
+}
+
+// Loading state management
+const LoadingState = {
+    activeRequests: 0,
+    
+    show(message = 'Procesando...') {
+        this.activeRequests++;
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.classList.add('active');
+            const textEl = overlay.querySelector('.loading-text');
+            if (textEl) textEl.textContent = message;
+        }
+    },
+    
+    hide() {
+        this.activeRequests--;
+        if (this.activeRequests <= 0) {
+            this.activeRequests = 0;
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+        }
+    }
+};
+
+// Button loading state helpers
+function setButtonLoading(button, isLoading) {
+    if (isLoading) {
+        button.classList.add('btn-loading');
+        button.disabled = true;
+    } else {
+        button.classList.remove('btn-loading');
+        button.disabled = false;
     }
 }
 
@@ -409,7 +454,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 // ============= USUARIOS SECTION =============
 
 function renderUsuarios() {
-    updateDashboardSummary();
     const usuarios = DB.getUsuarios();
     const tbody = document.querySelector('#usuarios-table tbody');
     
@@ -432,6 +476,7 @@ function renderUsuarios() {
             </td>
         </tr>
     `).join('');
+    updateDashboardSummary();
 }
 
 function openUsuarioModal(usuario = null) {
@@ -458,9 +503,11 @@ function openUsuarioModal(usuario = null) {
 
 document.getElementById('btn-add-usuario').addEventListener('click', () => openUsuarioModal());
 document.getElementById('btn-refresh-usuarios').addEventListener('click', async function() {
+    setButtonLoading(this, true);
     const refreshed = await DB.refresh({ render: true });
     renderUsuarios();
     showToast(refreshed ? 'Lista actualizada' : 'Mostrando datos locales', refreshed ? 'info' : 'warning');
+    setButtonLoading(this, false);
 });
 document.getElementById('btn-save-usuario').addEventListener('click', saveUsuario);
 
@@ -469,11 +516,14 @@ function saveUsuario() {
     const nombre = document.getElementById('nombre').value.trim();
     const primerApellido = document.getElementById('primerApellido').value.trim();
     const segundoApellido = document.getElementById('segundoApellido').value.trim();
+    const saveBtn = document.getElementById('btn-save-usuario');
     
     if (!nombre || !primerApellido) {
         showToast('Por favor complete los campos obligatorios', 'warning');
         return;
     }
+    
+    setButtonLoading(saveBtn, true);
     
     const usuarios = DB.getUsuarios();
     const usuario = { id: id || generateId(), nombre, primerApellido, segundoApellido };
@@ -491,6 +541,7 @@ function saveUsuario() {
     bootstrap.Modal.getInstance(document.getElementById('usuarioModal')).hide();
     renderUsuarios();
     populateUsuarioSelects();
+    setButtonLoading(saveBtn, false);
 }
 
 window.editUsuario = function(id) {
@@ -499,13 +550,36 @@ window.editUsuario = function(id) {
     openUsuarioModal(usuario);
 };
 
-window.deleteUsuario = function(id) {
+window.deleteUsuario = async function(id) {
     if (confirm('¿Está seguro de eliminar este usuario?')) {
         const usuarios = DB.getUsuarios().filter(u => u.id !== id);
         DB.setUsuarios(usuarios);
+        showTableSkeleton('#usuarios-table');
         renderUsuarios();
         populateUsuarioSelects();
         showToast('Usuario eliminado correctamente', 'success');
+    }
+};
+
+window.deleteAporte = async function(id) {
+    if (confirm('¿Está seguro de eliminar este aporte?')) {
+        const aportes = DB.getAportes().filter(a => a.id !== id);
+        DB.setAportes(aportes);
+        showTableSkeleton('#aporte-history-table');
+        renderAporteHistory();
+        updateTotalEnCaja();
+        showToast('Aporte eliminado correctamente', 'success');
+    }
+};
+
+window.deleteGasto = async function(id) {
+    if (confirm('¿Está seguro de eliminar este gasto?')) {
+        const gastos = DB.getGastos().filter(g => g.id !== id);
+        DB.setGastos(gastos);
+        showTableSkeleton('#gasto-history-table');
+        renderGastoHistory();
+        updateTotalEnCaja();
+        showToast('Gasto eliminado correctamente', 'success');
     }
 };
 
@@ -526,12 +600,13 @@ function populateUsuarioSelects() {
 
 // ============= APORTE SECTION =============
 
-document.getElementById('aporte-form').addEventListener('submit', function(e) {
+document.getElementById('aporte-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const selectedOptions = Array.from(document.getElementById('usuario-select').selectedOptions);
     const monto = parseFloat(document.getElementById('monto-aporte').value);
     const metodoPago = document.getElementById('metodo-pago-aporte').value;
+    const submitBtn = this.querySelector('button[type="submit"]');
     
     if (selectedOptions.length === 0) {
         showToast('Seleccione al menos un usuario', 'warning');
@@ -542,6 +617,8 @@ document.getElementById('aporte-form').addEventListener('submit', function(e) {
         showToast('Ingrese un monto válido', 'warning');
         return;
     }
+    
+    setButtonLoading(submitBtn, true);
     
     const aportes = DB.getAportes();
     selectedOptions.forEach(option => {
@@ -560,22 +637,26 @@ document.getElementById('aporte-form').addEventListener('submit', function(e) {
     showToast(`${selectedOptions.length} aporte(s) registrado(s) correctamente`, 'success');
     updateTotalEnCaja();
     renderAporteHistory();
+    setButtonLoading(submitBtn, false);
 });
 
 // ============= GASTOS SECTION =============
 
-document.getElementById('gastos-form').addEventListener('submit', function(e) {
+document.getElementById('gastos-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const fecha = document.getElementById('fecha-gasto').value;
     const razon = document.getElementById('razon-gasto').value.trim();
     const monto = parseFloat(document.getElementById('monto-gasto').value);
     const metodoPago = document.getElementById('metodo-pago-gasto').value;
+    const submitBtn = this.querySelector('button[type="submit"]');
     
     if (!razon || !monto || monto <= 0) {
         showToast('Complete todos los campos correctamente', 'warning');
         return;
     }
+    
+    setButtonLoading(submitBtn, true);
     
     const gastos = DB.getGastos();
     gastos.push({
@@ -592,6 +673,7 @@ document.getElementById('gastos-form').addEventListener('submit', function(e) {
     renderGastoHistory();
     updateTotalEnCaja();
     showToast('Gasto registrado correctamente', 'success');
+    setButtonLoading(submitBtn, false);
 });
 
 // ============= GASTOS HISTORY LIMPIEZA =============
@@ -1143,6 +1225,25 @@ function getMetodoPagoBadgeClass(metodo) {
     }
 }
 
+// Skeleton loading row generator
+function getSkeletonRow() {
+    return `
+        <tr class="skeleton-row">
+            <td><div class="skeleton-cell w-50"></div></td>
+            <td><div class="skeleton-cell w-75"></div></td>
+            <td><div class="skeleton-cell w-25"></div></td>
+        </tr>
+    `;
+}
+
+// Show skeleton loading in tables
+function showTableSkeleton(tableSelector, count = 3) {
+    const tbody = document.querySelector(`${tableSelector} tbody`);
+    if (tbody) {
+        tbody.innerHTML = Array(count).fill(0).map(() => getSkeletonRow()).join('');
+    }
+}
+
 // ============= APORTE EDIT/DELETE FUNCTIONS =============
 function openAporteModal(aporte = null) {
     const modal = document.getElementById('aporteModal');
@@ -1173,7 +1274,7 @@ function editAporte(id) {
     openAporteModal(aporte);
 }
 
-window.deleteAporte = function(id) {
+window.deleteAporte = async function(id) {
     if (confirm('¿Está seguro de eliminar este aporte?')) {
         const aportes = DB.getAportes().filter(a => a.id !== id);
         DB.setAportes(aportes);
@@ -1213,10 +1314,11 @@ function editGasto(id) {
     openGastoModal(gasto);
 }
 
-window.deleteGasto = function(id) {
+window.deleteGasto = async function(id) {
     if (confirm('¿Está seguro de eliminar este gasto?')) {
         const gastos = DB.getGastos().filter(g => g.id !== id);
         DB.setGastos(gastos);
+        showTableSkeleton('#gasto-history-table');
         renderGastoHistory();
         updateTotalEnCaja();
         showToast('Gasto eliminado correctamente', 'success');
@@ -1224,7 +1326,7 @@ window.deleteGasto = function(id) {
 };
 
 // ============= MODAL SAVE HANDLERS =============
-document.getElementById('btn-save-aporte-edit').addEventListener('click', function() {
+document.getElementById('btn-save-aporte-edit').addEventListener('click', async function() {
     const id = document.getElementById('aporte-edit-id').value;
     const monto = parseFloat(document.getElementById('aporte-edit-monto').value);
     const metodoPago = document.getElementById('aporte-edit-metodo-pago').value;
@@ -1234,11 +1336,12 @@ document.getElementById('btn-save-aporte-edit').addEventListener('click', functi
         return;
     }
     
+    setButtonLoading(this, true);
+    
     const aportes = DB.getAportes();
     const aporteIndex = aportes.findIndex(a => a.id === id);
     
     if (aporteIndex !== -1) {
-        // Update existing aporte
         aportes[aporteIndex] = {
             ...aportes[aporteIndex],
             monto: monto,
@@ -1246,7 +1349,6 @@ document.getElementById('btn-save-aporte-edit').addEventListener('click', functi
         };
         showToast('Aporte actualizado correctamente', 'success');
     } else {
-        // This shouldn't happen in edit mode, but just in case
         showToast('Error al actualizar el aporte', 'danger');
     }
     
@@ -1254,9 +1356,10 @@ document.getElementById('btn-save-aporte-edit').addEventListener('click', functi
     bootstrap.Modal.getInstance(document.getElementById('aporteModal')).hide();
     renderAporteHistory();
     updateTotalEnCaja();
+    setButtonLoading(this, false);
 });
 
-document.getElementById('btn-save-gasto-edit').addEventListener('click', function() {
+document.getElementById('btn-save-gasto-edit').addEventListener('click', async function() {
     const id = document.getElementById('gasto-edit-id').value;
     const fecha = document.getElementById('gasto-edit-fecha').value;
     const razon = document.getElementById('gasto-edit-razon').value.trim();
@@ -1268,11 +1371,12 @@ document.getElementById('btn-save-gasto-edit').addEventListener('click', functio
         return;
     }
     
+    setButtonLoading(this, true);
+    
     const gastos = DB.getGastos();
     const gastoIndex = gastos.findIndex(g => g.id === id);
     
     if (gastoIndex !== -1) {
-        // Update existing gasto
         gastos[gastoIndex] = {
             ...gastos[gastoIndex],
             fecha: fecha,
@@ -1282,7 +1386,6 @@ document.getElementById('btn-save-gasto-edit').addEventListener('click', functio
         };
         showToast('Gasto actualizado correctamente', 'success');
     } else {
-        // This shouldn't happen in edit mode, but just in case
         showToast('Error al actualizar el gasto', 'danger');
     }
     
@@ -1290,6 +1393,7 @@ document.getElementById('btn-save-gasto-edit').addEventListener('click', functio
     bootstrap.Modal.getInstance(document.getElementById('gastoModal')).hide();
     renderGastoHistory();
     updateTotalEnCaja();
+    setButtonLoading(this, false);
 });
 
 // ============= REPORTES DE GASTOS =============

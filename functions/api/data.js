@@ -148,6 +148,38 @@ async function writeData(kv, data) {
     return nextData;
 }
 
+async function patchCollection(kv, patch) {
+    const collection = patch.collection;
+    const previousList = Array.isArray(patch.previous) ? patch.previous : [];
+    const nextList = Array.isArray(patch.next) ? patch.next : [];
+    const previousById = new Map(previousList.filter(item => item && item.id).map(item => [item.id, item]));
+    const nextById = new Map(nextList.filter(item => item && item.id).map(item => [item.id, item]));
+
+    const deletedIds = previousList
+        .filter(item => item && item.id && !nextById.has(item.id))
+        .map(item => item.id);
+
+    const upserted = nextList.filter(item => {
+        if (!item || !item.id) return false;
+        const previousItem = previousById.get(item.id);
+        return !previousItem || JSON.stringify(previousItem) !== JSON.stringify(item);
+    });
+
+    if (patch.clear) {
+        await clearCollection(kv, collection);
+    } else {
+        await Promise.all([
+            ...deletedIds.map(id => kv.delete(itemKey(collection, id))),
+            ...upserted
+                .filter(item => item && item.id)
+                .map(item => kv.put(itemKey(collection, item.id), JSON.stringify(item)))
+        ]);
+    }
+
+    await writeUpdatedAt(kv);
+    return await readData(kv);
+}
+
 function requireKV(context) {
     const kv = getKV(context);
     if (!kv) {
@@ -191,21 +223,11 @@ export async function onRequestPatch(context) {
         return jsonResponse({ error: 'Coleccion invalida.' }, 400);
     }
 
-    if (patch.clear) {
-        await clearCollection(kv, patch.collection);
-    } else {
-        const deletedIds = Array.isArray(patch.deletedIds) ? patch.deletedIds : [];
-        const upserted = Array.isArray(patch.upserted) ? patch.upserted : [];
-
-        await Promise.all([
-            ...deletedIds.map(id => kv.delete(itemKey(patch.collection, id))),
-            ...upserted
-                .filter(item => item && item.id)
-                .map(item => kv.put(itemKey(patch.collection, item.id), JSON.stringify(item)))
-        ]);
+    try {
+        const nextData = await patchCollection(kv, patch);
+        return jsonResponse(nextData);
+    } catch (err) {
+        console.error('Error en PATCH:', err);
+        return jsonResponse({ error: 'Error al actualizar datos' }, 500);
     }
-
-    await writeUpdatedAt(kv);
-    const nextData = await readData(kv);
-    return jsonResponse(nextData);
 }
