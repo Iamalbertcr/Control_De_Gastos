@@ -144,24 +144,24 @@ const DB = (() => {
     }
 
     function schedulePatch(collection, previous, next, options = {}) {
-        if (!canUseRemote()) return;
+        if (!canUseRemote()) return Promise.resolve();
 
         if (!remoteEnabled && initialized) {
             warnLocalMode();
-            return;
+            return Promise.resolve();
         }
 
-        if (!remoteEnabled) return;
+        if (!remoteEnabled) return Promise.resolve();
 
         const patch = buildPatch(collection, previous, next, options);
         if (!patch.clear && patch.deletedIds.length === 0 && patch.upserted.length === 0) {
-            return;
+            return Promise.resolve();
         }
 
         pendingWrites += 1;
         LoadingState.show('Guardando cambios...');
         
-        saveQueue = saveQueue
+        return saveQueue = saveQueue
             .then(async () => {
                 const remoteData = await requestRemote('PATCH', patch);
                 remoteEnabled = true;
@@ -192,7 +192,8 @@ const DB = (() => {
             updatedAt: new Date().toISOString()
         };
         saveLocalData();
-        schedulePatch(collection, previous, state[collection], options);
+        window.dispatchEvent(new CustomEvent('data:changed', { detail: { collection } }));
+        return schedulePatch(collection, previous, state[collection], options);
     }
 
     async function init() {
@@ -440,11 +441,20 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderGastoHistory();
     updateTotalEnCaja();
 
-    if (!DB.isRemoteEnabled() && window.location.protocol !== 'file:') {
-        showToast('Modo local: configure un binding KV en Cloudflare para compartir datos', 'warning');
-    }
-
-    setInterval(() => {
+if (!DB.isRemoteEnabled() && window.location.protocol !== 'file:') {
+         showToast('Modo local: configure un binding KV en Cloudflare para compartir datos', 'warning');
+     }
+ 
+     // Listen for data changes to trigger real-time UI updates
+     window.addEventListener('data:changed', (e) => {
+         // Small debounce to prevent multiple rapid renders
+         clearTimeout(window.dataChangeTimer);
+         window.dataChangeTimer = setTimeout(() => {
+             updateDashboardSummary();
+         }, 50);
+     });
+ 
+     setInterval(() => {
         if (DB.isRemoteEnabled()) {
             DB.refresh({ render: true, silent: true });
         }
@@ -512,37 +522,40 @@ document.getElementById('btn-refresh-usuarios').addEventListener('click', async 
 document.getElementById('btn-save-usuario').addEventListener('click', saveUsuario);
 
 function saveUsuario() {
-    const id = document.getElementById('usuario-id').value;
-    const nombre = document.getElementById('nombre').value.trim();
-    const primerApellido = document.getElementById('primerApellido').value.trim();
-    const segundoApellido = document.getElementById('segundoApellido').value.trim();
-    const saveBtn = document.getElementById('btn-save-usuario');
-    
-    if (!nombre || !primerApellido) {
-        showToast('Por favor complete los campos obligatorios', 'warning');
-        return;
-    }
-    
-    setButtonLoading(saveBtn, true);
-    
-    const usuarios = DB.getUsuarios();
-    const usuario = { id: id || generateId(), nombre, primerApellido, segundoApellido };
-    
-    if (id) {
-        const index = usuarios.findIndex(u => u.id === id);
-        usuarios[index] = usuario;
-        showToast('Usuario actualizado correctamente', 'success');
-    } else {
-        usuarios.push(usuario);
-        showToast('Usuario creado correctamente', 'success');
-    }
-    
-    DB.setUsuarios(usuarios);
-    bootstrap.Modal.getInstance(document.getElementById('usuarioModal')).hide();
-    renderUsuarios();
-    populateUsuarioSelects();
-    setButtonLoading(saveBtn, false);
-}
+     const id = document.getElementById('usuario-id').value;
+     const nombre = document.getElementById('nombre').value.trim();
+     const primerApellido = document.getElementById('primerApellido').value.trim();
+     const segundoApellido = document.getElementById('segundoApellido').value.trim();
+     const saveBtn = document.getElementById('btn-save-usuario');
+     
+     if (!nombre || !primerApellido) {
+         showToast('Por favor complete los campos obligatorios', 'warning');
+         return;
+     }
+     
+     setButtonLoading(saveBtn, true);
+     
+     const usuarios = DB.getUsuarios();
+     const usuario = { id: id || generateId(), nombre, primerApellido, segundoApellido };
+     let message = '';
+     
+     if (id) {
+         const index = usuarios.findIndex(u => u.id === id);
+         usuarios[index] = usuario;
+         message = 'Usuario actualizado correctamente';
+     } else {
+         usuarios.push(usuario);
+         message = 'Usuario creado correctamente';
+     }
+     
+     // Renderizado optimista - actualizar UI inmediatamente
+     DB.setUsuarios(usuarios);
+     bootstrap.Modal.getInstance(document.getElementById('usuarioModal')).hide();
+     renderUsuarios();
+     populateUsuarioSelects();
+     showToast(message, 'success');
+     setButtonLoading(saveBtn, false);
+ }
 
 window.editUsuario = function(id) {
     const usuarios = DB.getUsuarios();
@@ -551,37 +564,37 @@ window.editUsuario = function(id) {
 };
 
 window.deleteUsuario = async function(id) {
-    if (confirm('¿Está seguro de eliminar este usuario?')) {
-        const usuarios = DB.getUsuarios().filter(u => u.id !== id);
-        DB.setUsuarios(usuarios);
-        showTableSkeleton('#usuarios-table');
-        renderUsuarios();
-        populateUsuarioSelects();
-        showToast('Usuario eliminado correctamente', 'success');
-    }
-};
+     if (confirm('¿Está seguro de eliminar este usuario?')) {
+         showTableSkeleton('#usuarios-table');
+         const usuarios = DB.getUsuarios().filter(u => u.id !== id);
+         DB.setUsuarios(usuarios);
+         renderUsuarios();
+         populateUsuarioSelects();
+         showToast('Usuario eliminado correctamente', 'success');
+     }
+ };
 
 window.deleteAporte = async function(id) {
-    if (confirm('¿Está seguro de eliminar este aporte?')) {
-        const aportes = DB.getAportes().filter(a => a.id !== id);
-        DB.setAportes(aportes);
-        showTableSkeleton('#aporte-history-table');
-        renderAporteHistory();
-        updateTotalEnCaja();
-        showToast('Aporte eliminado correctamente', 'success');
-    }
-};
-
-window.deleteGasto = async function(id) {
-    if (confirm('¿Está seguro de eliminar este gasto?')) {
-        const gastos = DB.getGastos().filter(g => g.id !== id);
-        DB.setGastos(gastos);
-        showTableSkeleton('#gasto-history-table');
-        renderGastoHistory();
-        updateTotalEnCaja();
-        showToast('Gasto eliminado correctamente', 'success');
-    }
-};
+     if (confirm('¿Está seguro de eliminar este aporte?')) {
+         showTableSkeleton('#aporte-history-table');
+         const aportes = DB.getAportes().filter(a => a.id !== id);
+         DB.setAportes(aportes);
+         renderAporteHistory();
+         updateTotalEnCaja();
+showToast('Aporte eliminado correctamente', 'success');
+     }
+ };
+ 
+ window.deleteGasto = async function(id) {
+     if (confirm('¿Está seguro de eliminar este gasto?')) {
+         showTableSkeleton('#gasto-history-table');
+         const gastos = DB.getGastos().filter(g => g.id !== id);
+         DB.setGastos(gastos);
+         renderGastoHistory();
+         updateTotalEnCaja();
+         showToast('Gasto eliminado correctamente', 'success');
+     }
+ };
 
 // ============= USUARIO SELECT POPULATION =============
 
@@ -601,80 +614,80 @@ function populateUsuarioSelects() {
 // ============= APORTE SECTION =============
 
 document.getElementById('aporte-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const selectedOptions = Array.from(document.getElementById('usuario-select').selectedOptions);
-    const monto = parseFloat(document.getElementById('monto-aporte').value);
-    const metodoPago = document.getElementById('metodo-pago-aporte').value;
-    const submitBtn = this.querySelector('button[type="submit"]');
-    
-    if (selectedOptions.length === 0) {
-        showToast('Seleccione al menos un usuario', 'warning');
-        return;
-    }
-    
-    if (!monto || monto <= 0) {
-        showToast('Ingrese un monto válido', 'warning');
-        return;
-    }
-    
-    setButtonLoading(submitBtn, true);
-    
-    const aportes = DB.getAportes();
-    selectedOptions.forEach(option => {
-        aportes.push({
-            id: generateId(),
-            usuarioId: option.value,
-            usuarioNombre: option.textContent,
-            monto: monto,
-            metodoPago: metodoPago,
-            fecha: new Date().toISOString().split('T')[0]
-        });
-    });
-    
-    DB.setAportes(aportes);
-    this.reset();
-    showToast(`${selectedOptions.length} aporte(s) registrado(s) correctamente`, 'success');
-    updateTotalEnCaja();
-    renderAporteHistory();
-    setButtonLoading(submitBtn, false);
-});
+     e.preventDefault();
+     
+     const selectedOptions = Array.from(document.getElementById('usuario-select').selectedOptions);
+     const monto = parseFloat(document.getElementById('monto-aporte').value);
+     const metodoPago = document.getElementById('metodo-pago-aporte').value;
+     const submitBtn = this.querySelector('button[type="submit"]');
+     
+     if (selectedOptions.length === 0) {
+         showToast('Seleccione al menos un usuario', 'warning');
+         return;
+     }
+     
+     if (!monto || monto <= 0) {
+         showToast('Ingrese un monto válido', 'warning');
+         return;
+     }
+     
+     setButtonLoading(submitBtn, true);
+     
+     const aportes = DB.getAportes();
+     selectedOptions.forEach(option => {
+         aportes.push({
+             id: generateId(),
+             usuarioId: option.value,
+             usuarioNombre: option.textContent,
+             monto: monto,
+             metodoPago: metodoPago,
+             fecha: new Date().toISOString().split('T')[0]
+         });
+     });
+     
+     DB.setAportes(aportes);
+     this.reset();
+     showToast(`${selectedOptions.length} aporte(s) registrado(s) correctamente`, 'success');
+     renderAporteHistory();
+     updateTotalEnCaja();
+     setButtonLoading(submitBtn, false);
+ });
 
 // ============= GASTOS SECTION =============
 
 document.getElementById('gastos-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const fecha = document.getElementById('fecha-gasto').value;
-    const razon = document.getElementById('razon-gasto').value.trim();
-    const monto = parseFloat(document.getElementById('monto-gasto').value);
-    const metodoPago = document.getElementById('metodo-pago-gasto').value;
-    const submitBtn = this.querySelector('button[type="submit"]');
-    
-    if (!razon || !monto || monto <= 0) {
-        showToast('Complete todos los campos correctamente', 'warning');
-        return;
-    }
-    
-    setButtonLoading(submitBtn, true);
-    
-    const gastos = DB.getGastos();
-    gastos.push({
-        id: generateId(),
-        fecha: fecha,
-        razon: razon,
-        monto: monto,
-        metodoPago: metodoPago
-    });
-    
-    DB.setGastos(gastos);
-    this.reset();
-    document.getElementById('fecha-gasto').value = new Date().toISOString().split('T')[0];
-    renderGastoHistory();
-    updateTotalEnCaja();
-    showToast('Gasto registrado correctamente', 'success');
-    setButtonLoading(submitBtn, false);
-});
+     e.preventDefault();
+     
+     const fecha = document.getElementById('fecha-gasto').value;
+     const razon = document.getElementById('razon-gasto').value.trim();
+     const monto = parseFloat(document.getElementById('monto-gasto').value);
+     const metodoPago = document.getElementById('metodo-pago-gasto').value;
+     const submitBtn = this.querySelector('button[type="submit"]');
+     
+     if (!razon || !monto || monto <= 0) {
+         showToast('Complete todos los campos correctamente', 'warning');
+         return;
+     }
+     
+     setButtonLoading(submitBtn, true);
+     
+     const gastos = DB.getGastos();
+     gastos.push({
+         id: generateId(),
+         fecha: fecha,
+         razon: razon,
+         monto: monto,
+         metodoPago: metodoPago
+     });
+     
+     DB.setGastos(gastos);
+     this.reset();
+     document.getElementById('fecha-gasto').value = new Date().toISOString().split('T')[0];
+     showToast('Gasto registrado correctamente', 'success');
+     renderGastoHistory();
+     updateTotalEnCaja();
+     setButtonLoading(submitBtn, false);
+ });
 
 // ============= GASTOS HISTORY LIMPIEZA =============
 
@@ -1315,15 +1328,15 @@ function editGasto(id) {
 }
 
 window.deleteGasto = async function(id) {
-    if (confirm('¿Está seguro de eliminar este gasto?')) {
-        const gastos = DB.getGastos().filter(g => g.id !== id);
-        DB.setGastos(gastos);
-        showTableSkeleton('#gasto-history-table');
-        renderGastoHistory();
-        updateTotalEnCaja();
-        showToast('Gasto eliminado correctamente', 'success');
-    }
-};
+     if (confirm('¿Está seguro de eliminar este gasto?')) {
+         showTableSkeleton('#gasto-history-table');
+         const gastos = DB.getGastos().filter(g => g.id !== id);
+         DB.setGastos(gastos);
+         renderGastoHistory();
+         updateTotalEnCaja();
+         showToast('Gasto eliminado correctamente', 'success');
+     }
+ };
 
 // ============= MODAL SAVE HANDLERS =============
 document.getElementById('btn-save-aporte-edit').addEventListener('click', async function() {
