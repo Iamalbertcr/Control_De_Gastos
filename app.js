@@ -521,41 +521,41 @@ document.getElementById('btn-refresh-usuarios').addEventListener('click', async 
 });
 document.getElementById('btn-save-usuario').addEventListener('click', saveUsuario);
 
-function saveUsuario() {
-     const id = document.getElementById('usuario-id').value;
-     const nombre = document.getElementById('nombre').value.trim();
-     const primerApellido = document.getElementById('primerApellido').value.trim();
-     const segundoApellido = document.getElementById('segundoApellido').value.trim();
-     const saveBtn = document.getElementById('btn-save-usuario');
-     
-     if (!nombre || !primerApellido) {
-         showToast('Por favor complete los campos obligatorios', 'warning');
-         return;
-     }
-     
-     setButtonLoading(saveBtn, true);
-     
-     const usuarios = DB.getUsuarios();
-     const usuario = { id: id || generateId(), nombre, primerApellido, segundoApellido };
-     let message = '';
-     
-     if (id) {
-         const index = usuarios.findIndex(u => u.id === id);
-         usuarios[index] = usuario;
-         message = 'Usuario actualizado correctamente';
-     } else {
-         usuarios.push(usuario);
-         message = 'Usuario creado correctamente';
-     }
-     
-     // Renderizado optimista - actualizar UI inmediatamente
-     DB.setUsuarios(usuarios);
-     bootstrap.Modal.getInstance(document.getElementById('usuarioModal')).hide();
-     renderUsuarios();
-     populateUsuarioSelects();
-     showToast(message, 'success');
-     setButtonLoading(saveBtn, false);
- }
+async function saveUsuario() {
+      const id = document.getElementById('usuario-id').value;
+      const nombre = document.getElementById('nombre').value.trim();
+      const primerApellido = document.getElementById('primerApellido').value.trim();
+      const segundoApellido = document.getElementById('segundoApellido').value.trim();
+      const saveBtn = document.getElementById('btn-save-usuario');
+      
+      if (!nombre || !primerApellido) {
+          showToast('Por favor complete los campos obligatorios', 'warning');
+          return;
+      }
+      
+      setButtonLoading(saveBtn, true);
+      
+      const usuarios = DB.getUsuarios();
+      const usuario = { id: id || generateId(), nombre, primerApellido, segundoApellido };
+      let message = '';
+      
+      if (id) {
+          const index = usuarios.findIndex(u => u.id === id);
+          usuarios[index] = usuario;
+          message = 'Usuario actualizado correctamente';
+      } else {
+          usuarios.push(usuario);
+          message = 'Usuario creado correctamente';
+      }
+      
+      await DB.setUsuarios(usuarios);
+      
+      bootstrap.Modal.getInstance(document.getElementById('usuarioModal')).hide();
+      renderUsuarios();
+      populateUsuarioSelects();
+      showToast(message, 'success');
+      setButtonLoading(saveBtn, false);
+  }
 
 window.editUsuario = function(id) {
     const usuarios = DB.getUsuarios();
@@ -1360,15 +1360,17 @@ document.getElementById('btn-save-aporte-edit').addEventListener('click', async 
             monto: monto,
             metodoPago: metodoPago
         };
+        
+        await DB.setAportes(aportes);
+        
+        bootstrap.Modal.getInstance(document.getElementById('aporteModal')).hide();
+        renderAporteHistory();
+        updateTotalEnCaja();
         showToast('Aporte actualizado correctamente', 'success');
     } else {
         showToast('Error al actualizar el aporte', 'danger');
     }
     
-    DB.setAportes(aportes);
-    bootstrap.Modal.getInstance(document.getElementById('aporteModal')).hide();
-    renderAporteHistory();
-    updateTotalEnCaja();
     setButtonLoading(this, false);
 });
 
@@ -1397,15 +1399,17 @@ document.getElementById('btn-save-gasto-edit').addEventListener('click', async f
             monto: monto,
             metodoPago: metodoPago
         };
+        
+        await DB.setGastos(gastos);
+        
+        bootstrap.Modal.getInstance(document.getElementById('gastoModal')).hide();
+        renderGastoHistory();
+        updateTotalEnCaja();
         showToast('Gasto actualizado correctamente', 'success');
     } else {
         showToast('Error al actualizar el gasto', 'danger');
     }
     
-    DB.setGastos(gastos);
-    bootstrap.Modal.getInstance(document.getElementById('gastoModal')).hide();
-    renderGastoHistory();
-    updateTotalEnCaja();
     setButtonLoading(this, false);
 });
 
