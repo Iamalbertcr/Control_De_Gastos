@@ -155,15 +155,19 @@ async function patchCollection(kv, patch) {
     const previousById = new Map(previousList.filter(item => item && item.id).map(item => [item.id, item]));
     const nextById = new Map(nextList.filter(item => item && item.id).map(item => [item.id, item]));
 
-    const deletedIds = previousList
-        .filter(item => item && item.id && !nextById.has(item.id))
-        .map(item => item.id);
+    const deletedIds = Array.isArray(patch.deletedIds)
+        ? patch.deletedIds.filter(id => typeof id === 'string' && id)
+        : previousList
+            .filter(item => item && item.id && !nextById.has(item.id))
+            .map(item => item.id);
 
-    const upserted = nextList.filter(item => {
-        if (!item || !item.id) return false;
-        const previousItem = previousById.get(item.id);
-        return !previousItem || JSON.stringify(previousItem) !== JSON.stringify(item);
-    });
+    const upserted = Array.isArray(patch.upserted)
+        ? patch.upserted.filter(item => item && item.id)
+        : nextList.filter(item => {
+            if (!item || !item.id) return false;
+            const previousItem = previousById.get(item.id);
+            return !previousItem || JSON.stringify(previousItem) !== JSON.stringify(item);
+        });
 
     if (patch.clear) {
         await clearCollection(kv, collection);

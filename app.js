@@ -567,32 +567,10 @@ window.deleteUsuario = async function(id) {
      if (confirm('¿Está seguro de eliminar este usuario?')) {
          showTableSkeleton('#usuarios-table');
          const usuarios = DB.getUsuarios().filter(u => u.id !== id);
-         DB.setUsuarios(usuarios);
+         await DB.setUsuarios(usuarios);
          renderUsuarios();
          populateUsuarioSelects();
          showToast('Usuario eliminado correctamente', 'success');
-     }
- };
-
-window.deleteAporte = async function(id) {
-     if (confirm('¿Está seguro de eliminar este aporte?')) {
-         showTableSkeleton('#aporte-history-table');
-         const aportes = DB.getAportes().filter(a => a.id !== id);
-         DB.setAportes(aportes);
-         renderAporteHistory();
-         updateTotalEnCaja();
-showToast('Aporte eliminado correctamente', 'success');
-     }
- };
- 
- window.deleteGasto = async function(id) {
-     if (confirm('¿Está seguro de eliminar este gasto?')) {
-         showTableSkeleton('#gasto-history-table');
-         const gastos = DB.getGastos().filter(g => g.id !== id);
-         DB.setGastos(gastos);
-         renderGastoHistory();
-         updateTotalEnCaja();
-         showToast('Gasto eliminado correctamente', 'success');
      }
  };
 
@@ -1262,15 +1240,20 @@ function openAporteModal(aporte = null) {
     const modal = document.getElementById('aporteModal');
     const modalLabel = document.getElementById('aporteModalLabel');
     const form = document.getElementById('aporte-edit-form');
+    const usuarioSelect = document.getElementById('aporte-edit-usuario');
     
     form.reset();
     document.getElementById('aporte-edit-id').value = '';
+    usuarioSelect.innerHTML = DB.getUsuarios().map(u =>
+        `<option value="${u.id}">${u.nombre} ${u.primerApellido} ${u.segundoApellido || ''}</option>`
+    ).join('');
     
     if (aporte) {
         modalLabel.innerHTML = '<i class="fas fa-coins"></i> Editar Aporte';
         document.getElementById('aporte-edit-id').value = aporte.id;
-        // Set usuario selection (this would need to be implemented based on your usuario selection logic)
-        // For simplicity, we're just setting the basic fields
+        Array.from(usuarioSelect.options).forEach(option => {
+            option.selected = option.value === aporte.usuarioId;
+        });
         document.getElementById('aporte-edit-monto').value = aporte.monto;
         document.getElementById('aporte-edit-metodo-pago').value = aporte.metodoPago;
     } else {
@@ -1289,8 +1272,9 @@ function editAporte(id) {
 
 window.deleteAporte = async function(id) {
     if (confirm('¿Está seguro de eliminar este aporte?')) {
+        showTableSkeleton('#aporte-history-table');
         const aportes = DB.getAportes().filter(a => a.id !== id);
-        DB.setAportes(aportes);
+        await DB.setAportes(aportes);
         renderAporteHistory();
         updateTotalEnCaja();
         showToast('Aporte eliminado correctamente', 'success');
@@ -1331,7 +1315,7 @@ window.deleteGasto = async function(id) {
      if (confirm('¿Está seguro de eliminar este gasto?')) {
          showTableSkeleton('#gasto-history-table');
          const gastos = DB.getGastos().filter(g => g.id !== id);
-         DB.setGastos(gastos);
+         await DB.setGastos(gastos);
          renderGastoHistory();
          updateTotalEnCaja();
          showToast('Gasto eliminado correctamente', 'success');
@@ -1341,9 +1325,15 @@ window.deleteGasto = async function(id) {
 // ============= MODAL SAVE HANDLERS =============
 document.getElementById('btn-save-aporte-edit').addEventListener('click', async function() {
     const id = document.getElementById('aporte-edit-id').value;
+    const selectedUser = document.getElementById('aporte-edit-usuario').selectedOptions[0];
     const monto = parseFloat(document.getElementById('aporte-edit-monto').value);
     const metodoPago = document.getElementById('aporte-edit-metodo-pago').value;
     
+    if (!selectedUser) {
+        showToast('Seleccione un usuario', 'warning');
+        return;
+    }
+
     if (!monto || monto <= 0) {
         showToast('Ingrese un monto válido', 'warning');
         return;
@@ -1357,6 +1347,8 @@ document.getElementById('btn-save-aporte-edit').addEventListener('click', async 
     if (aporteIndex !== -1) {
         aportes[aporteIndex] = {
             ...aportes[aporteIndex],
+            usuarioId: selectedUser.value,
+            usuarioNombre: selectedUser.textContent,
             monto: monto,
             metodoPago: metodoPago
         };
